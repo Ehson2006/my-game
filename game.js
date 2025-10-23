@@ -84,12 +84,13 @@ const player = {
 const obstacles = [];
 const coins = [];
 
-// Таймеры для генерации препятствий и монет
 let lastObstacleTime = 0;
-let obstacleInterval = 1500; // мс между препятствиями
-
+let obstacleInterval = 1500;
 let lastCoinTime = 0;
-let coinInterval = 1200; // мс между монетами
+let coinInterval = 1200;
+
+// Минимальное расстояние между препятствиями (по горизонтали)
+const MIN_OBSTACLE_GAP = 250; // пикселей
 
 class Obstacle {
     constructor() {
@@ -97,7 +98,7 @@ class Obstacle {
         this.height = 60 + Math.random() * 40;
         this.x = canvas.width;
         this.y = canvas.height - 100 - this.height;
-        this.speed = 5 + score * 0.05;
+        this.speed = 4.5 + Math.min(score * 0.03, 6); // скорость увеличивается, но ограничена
     }
 
     update() {
@@ -122,7 +123,7 @@ class Coin {
         this.radius = 15;
         this.x = canvas.width;
         this.y = canvas.height - 200 - Math.random() * 150;
-        this.speed = 5 + score * 0.05;
+        this.speed = 4.5 + Math.min(score * 0.03, 6);
         this.collected = false;
     }
 
@@ -196,20 +197,24 @@ function gameLoop() {
 
     // === Спавн препятствий ===
     if (now - lastObstacleTime > obstacleInterval) {
-        obstacles.push(new Obstacle());
-        lastObstacleTime = now;
-        obstacleInterval = 1200 + Math.random() * 1300; // 1.2 - 2.5 сек
+        const lastObstacle = obstacles[obstacles.length - 1];
+        if (!lastObstacle || lastObstacle.x < canvas.width - MIN_OBSTACLE_GAP) {
+            obstacles.push(new Obstacle());
+            lastObstacleTime = now;
+            obstacleInterval = 1300 + Math.random() * 1200; // 1.3 - 2.5 сек
+        }
     }
 
     // === Спавн монет ===
     if (now - lastCoinTime > coinInterval) {
-        if (Math.random() < 0.7) { // 70% шанс появления монеты
+        if (Math.random() < 0.7) {
             coins.push(new Coin());
         }
         lastCoinTime = now;
-        coinInterval = 1000 + Math.random() * 1500; // 1 - 2.5 сек
+        coinInterval = 1000 + Math.random() * 1500;
     }
 
+    // Обновление препятствий
     for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].update();
         obstacles[i].draw();
@@ -224,6 +229,7 @@ function gameLoop() {
         }
     }
 
+    // Обновление монет
     for (let i = coins.length - 1; i >= 0; i--) {
         coins[i].update();
         coins[i].draw();
