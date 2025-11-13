@@ -1,5 +1,6 @@
 // === Получение элементов ===
 const canvas = document.getElementById('game-canvas');
+const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const startScreen = document.getElementById('start-screen');
 const gameScreen = document.getElementById('game-screen');
@@ -9,41 +10,19 @@ const restartBtn = document.getElementById('restart-btn');
 const scoreDisplay = document.getElementById('score');
 const finalScoreDisplay = document.getElementById('final-score');
 
-// === Глобальные переменные ===
 let gameRunning = false;
 let score = 0;
 let animationId;
-let cloudOffset = 0;
 
-// === Константы ===
-const GROUND_HEIGHT = 100;
-const PLAYER_COLOR = '#667eea';
-const OBSTACLE_COLOR = '#ff6b6b';
-const COIN_COLOR = '#ffd700';
-const MIN_OBSTACLE_GAP = 250;
-
-// === Аудио ===
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-let audioUnlocked = false;
-
-function unlockAudio() {
-    if (!audioUnlocked) {
-        const buffer = audioContext.createBuffer(1, 1, 22050);
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-        source.start();
-        audioUnlocked = true;
-    }
-}
 
 function playSound(frequency, duration, type = 'sine') {
-    if (!audioUnlocked) return;
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
 
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
+
     oscillator.frequency.value = frequency;
     oscillator.type = type;
 
@@ -54,12 +33,12 @@ function playSound(frequency, duration, type = 'sine') {
     oscillator.stop(audioContext.currentTime + duration);
 }
 
-// === Размеры холста ===
 function resizeCanvas() {
     const container = document.getElementById('game-container');
     canvas.width = container.clientWidth;
     canvas.height = container.clientHeight;
 }
+
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
@@ -71,14 +50,14 @@ const player = {
     height: 40,
     velocityY: 0,
     gravity: 0.6,
-    jumpPower: -12,
+    jumpPower: -14, // прыжок стал немного выше
     onGround: false,
 
     update() {
         this.velocityY += this.gravity;
         this.y += this.velocityY;
 
-        const ground = canvas.height - GROUND_HEIGHT;
+        const ground = canvas.height - 100;
         if (this.y >= ground - this.height) {
             this.y = ground - this.height;
             this.velocityY = 0;
@@ -96,15 +75,16 @@ const player = {
     },
 
     draw() {
-        ctx.fillStyle = PLAYER_COLOR;
+        ctx.fillStyle = '#667eea';
         ctx.fillRect(this.x, this.y, this.width, this.height);
+
         ctx.fillStyle = 'white';
         ctx.fillRect(this.x + 10, this.y + 10, 8, 8);
         ctx.fillRect(this.x + 22, this.y + 10, 8, 8);
     }
 };
 
-// === Массивы ===
+// === Препятствия и монеты ===
 const obstacles = [];
 const coins = [];
 
@@ -112,15 +92,16 @@ let lastObstacleTime = 0;
 let obstacleInterval = 1500;
 let lastCoinTime = 0;
 let coinInterval = 1200;
+const MIN_OBSTACLE_GAP = 250;
 
-// === Классы объектов ===
+// === Класс препятствия ===
 class Obstacle {
     constructor() {
-        this.width = 30 + Math.random() * 20;
-        this.height = 60 + Math.random() * 40;
+        this.width = 30 + Math.random() * 25;
+        this.height = 40 + Math.random() * 40; // раньше было слишком большое — теперь сбалансировано
         this.x = canvas.width;
-        this.y = canvas.height - GROUND_HEIGHT - this.height;
-        this.speed = 4.5 + Math.min(score * 0.03, 6);
+        this.y = canvas.height - 100 - this.height;
+        this.speed = 4 + Math.min(score * 0.03, 6); // скорость растёт, но ограничена
     }
 
     update() {
@@ -128,7 +109,7 @@ class Obstacle {
     }
 
     draw() {
-        ctx.fillStyle = OBSTACLE_COLOR;
+        ctx.fillStyle = '#ff6b6b';
         ctx.fillRect(this.x, this.y, this.width, this.height);
     }
 
@@ -142,12 +123,13 @@ class Obstacle {
     }
 }
 
+// === Класс монеты ===
 class Coin {
     constructor() {
         this.radius = 15;
         this.x = canvas.width;
         this.y = canvas.height - 200 - Math.random() * 150;
-        this.speed = 4.5 + Math.min(score * 0.03, 6);
+        this.speed = 4 + Math.min(score * 0.03, 6);
         this.collected = false;
     }
 
@@ -156,7 +138,7 @@ class Coin {
     }
 
     draw() {
-        ctx.fillStyle = COIN_COLOR;
+        ctx.fillStyle = '#ffd700';
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
@@ -175,13 +157,14 @@ class Coin {
     }
 }
 
-// === Рисование земли и облаков ===
+// === Фон, облака и земля ===
 function drawGround() {
     ctx.fillStyle = '#90ee90';
-    ctx.fillRect(0, canvas.height - GROUND_HEIGHT, canvas.width, GROUND_HEIGHT);
+    ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
+
     ctx.fillStyle = '#228b22';
     for (let i = 0; i < canvas.width; i += 40) {
-        ctx.fillRect(i, canvas.height - GROUND_HEIGHT, 30, 5);
+        ctx.fillRect(i, canvas.height - 100, 30, 5);
     }
 }
 
@@ -203,14 +186,18 @@ function drawClouds(offset) {
     });
 }
 
-// === Игровой цикл ===
+let cloudOffset = 0;
+
+// === Главный цикл ===
 function gameLoop() {
     if (!gameRunning) return;
+
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     cloudOffset++;
     drawClouds(cloudOffset);
     drawGround();
+
     player.update();
     player.draw();
 
@@ -227,35 +214,43 @@ function gameLoop() {
     }
 
     // Спавн монет
-    if (now - lastCoinTime > coinInterval && Math.random() < 0.7) {
-        coins.push(new Coin());
+    if (now - lastCoinTime > coinInterval) {
+        if (Math.random() < 0.7) {
+            coins.push(new Coin());
+        }
         lastCoinTime = now;
         coinInterval = 1000 + Math.random() * 1500;
     }
 
     // Обновление препятствий
     for (let i = obstacles.length - 1; i >= 0; i--) {
-        obstacles[i].update();
-        obstacles[i].draw();
+        const obs = obstacles[i];
+        obs.update();
+        obs.draw();
 
-        if (obstacles[i].collidesWith(player)) {
-            return gameOver();
+        if (obs.collidesWith(player)) {
+            gameOver();
+            return;
         }
-        if (obstacles[i].x + obstacles[i].width < 0) obstacles.splice(i, 1);
+
+        if (obs.x + obs.width < 0) {
+            obstacles.splice(i, 1);
+        }
     }
 
     // Обновление монет
     for (let i = coins.length - 1; i >= 0; i--) {
-        coins[i].update();
-        coins[i].draw();
+        const coin = coins[i];
+        coin.update();
+        coin.draw();
 
-        if (!coins[i].collected && coins[i].collidesWith(player)) {
-            coins[i].collected = true;
+        if (!coin.collected && coin.collidesWith(player)) {
+            coin.collected = true;
             score += 10;
             scoreDisplay.textContent = score;
             playSound(600, 0.15, 'sine');
             coins.splice(i, 1);
-        } else if (coins[i].x + coins[i].radius < 0) {
+        } else if (coin.x + coin.radius < 0) {
             coins.splice(i, 1);
         }
     }
@@ -263,20 +258,16 @@ function gameLoop() {
     animationId = requestAnimationFrame(gameLoop);
 }
 
-// === Управление ===
+// === Управление игрой ===
 function startGame() {
-    if (gameRunning) return;
-    unlockAudio();
     startScreen.classList.remove('active');
     gameScreen.classList.add('active');
-    gameOverScreen.classList.remove('active');
-
     gameRunning = true;
     score = 0;
     scoreDisplay.textContent = score;
     obstacles.length = 0;
     coins.length = 0;
-    player.y = canvas.height - GROUND_HEIGHT - player.height;
+    player.y = canvas.height - 100 - player.height;
     player.velocityY = 0;
     cloudOffset = 0;
     lastObstacleTime = Date.now();
@@ -299,12 +290,25 @@ function restart() {
     startGame();
 }
 
-// === События ===
-canvas.addEventListener('click', () => { if (gameRunning) player.jump(); });
-canvas.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameRunning) player.jump(); });
+// === Управление (мышь + сенсор) ===
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    if (gameRunning) player.jump();
+});
+
+canvas.addEventListener('click', () => {
+    if (gameRunning) player.jump();
+});
 
 playBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', restart);
-playBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startGame(); });
-restartBtn.addEventListener('touchstart', (e) => { e.preventDefault(); restart(); });
 
+playBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    startGame();
+});
+
+restartBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    restart();
+});
