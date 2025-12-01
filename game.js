@@ -1,6 +1,5 @@
 // === Получение элементов ===
 const canvas = document.getElementById('game-canvas');
-const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const startScreen = document.getElementById('start-screen');
 const gameScreen = document.getElementById('game-screen');
@@ -14,31 +13,32 @@ let gameRunning = false;
 let score = 0;
 let animationId;
 
+// === Аудио ===
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
 function playSound(frequency, duration, type = 'sine') {
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
 
-    oscillator.frequency.value = frequency;
-    oscillator.type = type;
+    osc.frequency.value = frequency;
+    osc.type = type;
 
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+    gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
 
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + duration);
+    osc.start(audioContext.currentTime);
+    osc.stop(audioContext.currentTime + duration);
 }
 
+// === Canvas Resize ===
 function resizeCanvas() {
     const container = document.getElementById('game-container');
     canvas.width = container.clientWidth;
     canvas.height = container.clientHeight;
 }
-
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
@@ -50,7 +50,7 @@ const player = {
     height: 40,
     velocityY: 0,
     gravity: 0.6,
-    jumpPower: -14, // прыжок стал немного выше
+    jumpPower: -14,
     onGround: false,
 
     update() {
@@ -58,6 +58,7 @@ const player = {
         this.y += this.velocityY;
 
         const ground = canvas.height - 100;
+
         if (this.y >= ground - this.height) {
             this.y = ground - this.height;
             this.velocityY = 0;
@@ -70,7 +71,7 @@ const player = {
     jump() {
         if (this.onGround) {
             this.velocityY = this.jumpPower;
-            playSound(400, 0.1, 'square');
+            playSound(400, 0.1, "square");
         }
     },
 
@@ -84,7 +85,7 @@ const player = {
     }
 };
 
-// === Препятствия и монеты ===
+// === Объекты ===
 const obstacles = [];
 const coins = [];
 
@@ -94,14 +95,14 @@ let lastCoinTime = 0;
 let coinInterval = 1200;
 const MIN_OBSTACLE_GAP = 250;
 
-// === Класс препятствия ===
+// --- Препятствие ---
 class Obstacle {
     constructor() {
         this.width = 30 + Math.random() * 25;
-        this.height = 40 + Math.random() * 40; // раньше было слишком большое — теперь сбалансировано
+        this.height = 40 + Math.random() * 40;
         this.x = canvas.width;
         this.y = canvas.height - 100 - this.height;
-        this.speed = 4 + Math.min(score * 0.03, 6); // скорость растёт, но ограничена
+        this.speed = 4 + Math.min(score * 0.03, 6);
     }
 
     update() {
@@ -123,7 +124,7 @@ class Obstacle {
     }
 }
 
-// === Класс монеты ===
+// --- Монета ---
 class Coin {
     constructor() {
         this.radius = 15;
@@ -133,9 +134,7 @@ class Coin {
         this.collected = false;
     }
 
-    update() {
-        this.x -= this.speed;
-    }
+    update() { this.x -= this.speed; }
 
     draw() {
         ctx.fillStyle = '#ffd700';
@@ -152,31 +151,27 @@ class Coin {
     collidesWith(player) {
         const dx = this.x - (player.x + player.width / 2);
         const dy = this.y - (player.y + player.height / 2);
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < this.radius + 20;
+        return Math.sqrt(dx * dx + dy * dy) < this.radius + 20;
     }
 }
 
-// === Фон, облака и земля ===
+// === Фон ===
+let cloudOffset = 0;
+
 function drawGround() {
     ctx.fillStyle = '#90ee90';
     ctx.fillRect(0, canvas.height - 100, canvas.width, 100);
-
-    ctx.fillStyle = '#228b22';
-    for (let i = 0; i < canvas.width; i += 40) {
-        ctx.fillRect(i, canvas.height - 100, 30, 5);
-    }
 }
 
 function drawClouds(offset) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    const cloudPositions = [
+    const clouds = [
         { x: 100 + offset * 0.3, y: 80 },
         { x: 300 + offset * 0.5, y: 120 },
         { x: 500 + offset * 0.2, y: 60 }
     ];
 
-    cloudPositions.forEach(cloud => {
+    clouds.forEach(cloud => {
         const x = cloud.x % (canvas.width + 100);
         ctx.beginPath();
         ctx.arc(x, cloud.y, 30, 0, Math.PI * 2);
@@ -186,9 +181,7 @@ function drawClouds(offset) {
     });
 }
 
-let cloudOffset = 0;
-
-// === Главный цикл ===
+// === Игровой цикл ===
 function gameLoop() {
     if (!gameRunning) return;
 
@@ -215,14 +208,12 @@ function gameLoop() {
 
     // Спавн монет
     if (now - lastCoinTime > coinInterval) {
-        if (Math.random() < 0.7) {
-            coins.push(new Coin());
-        }
+        if (Math.random() < 0.7) coins.push(new Coin());
         lastCoinTime = now;
         coinInterval = 1000 + Math.random() * 1500;
     }
 
-    // Обновление препятствий
+    // Объекты
     for (let i = obstacles.length - 1; i >= 0; i--) {
         const obs = obstacles[i];
         obs.update();
@@ -232,13 +223,9 @@ function gameLoop() {
             gameOver();
             return;
         }
-
-        if (obs.x + obs.width < 0) {
-            obstacles.splice(i, 1);
-        }
+        if (obs.x + obs.width < 0) obstacles.splice(i, 1);
     }
 
-    // Обновление монет
     for (let i = coins.length - 1; i >= 0; i--) {
         const coin = coins[i];
         coin.update();
@@ -258,7 +245,7 @@ function gameLoop() {
     animationId = requestAnimationFrame(gameLoop);
 }
 
-// === Управление игрой ===
+// === Управление ===
 function startGame() {
     startScreen.classList.remove('active');
     gameScreen.classList.add('active');
@@ -278,7 +265,7 @@ function startGame() {
 function gameOver() {
     gameRunning = false;
     cancelAnimationFrame(animationId);
-    playSound(200, 0.3, 'sawtooth');
+    playSound(200, 0.3, "sawtooth");
 
     gameScreen.classList.remove('active');
     gameOverScreen.classList.add('active');
@@ -290,25 +277,25 @@ function restart() {
     startGame();
 }
 
-// === Управление (мышь + сенсор) ===
-canvas.addEventListener('touchstart', (e) => {
-    e.preventDefault();
+// === События ===
+canvas.addEventListener('click', () => {
     if (gameRunning) player.jump();
 });
 
-canvas.addEventListener('click', () => {
+canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
     if (gameRunning) player.jump();
 });
 
 playBtn.addEventListener('click', startGame);
 restartBtn.addEventListener('click', restart);
 
-playBtn.addEventListener('touchstart', (e) => {
+playBtn.addEventListener('touchstart', e => {
     e.preventDefault();
     startGame();
 });
 
-restartBtn.addEventListener('touchstart', (e) => {
+restartBtn.addEventListener('touchstart', e => {
     e.preventDefault();
     restart();
 });
